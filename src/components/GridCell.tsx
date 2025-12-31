@@ -1,14 +1,30 @@
-import { useState, useRef, type ChangeEvent } from 'react'
+import { useState, useRef, useEffect, type ChangeEvent } from 'react'
+
+interface Position {
+  x: number
+  y: number
+}
 
 interface GridCellProps {
   image: string | null
+  position: Position
   onImageSet: (image: string) => void
   onImageClear: () => void
+  onPositionChange: (position: Position) => void
 }
 
-export function GridCell({ image, onImageSet, onImageClear }: GridCellProps) {
+export function GridCell({
+  image,
+  position,
+  onImageSet,
+  onImageClear,
+  onPositionChange,
+}: GridCellProps) {
   const [urlInput, setUrlInput] = useState('')
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState<Position>({ x: 0, y: 0 })
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const handleUrlSubmit = () => {
     if (urlInput.trim()) {
@@ -41,21 +57,92 @@ export function GridCell({ image, onImageSet, onImageClear }: GridCellProps) {
     fileInputRef.current?.click()
   }
 
+  const handleDragStart = (clientX: number, clientY: number) => {
+    setIsDragging(true)
+    setDragStart({
+      x: clientX - position.x,
+      y: clientY - position.y,
+    })
+  }
+
+  const handleDragMove = (clientX: number, clientY: number) => {
+    if (!isDragging) return
+    onPositionChange({
+      x: clientX - dragStart.x,
+      y: clientY - dragStart.y,
+    })
+  }
+
+  const handleDragEnd = () => {
+    setIsDragging(false)
+  }
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    handleDragStart(e.clientX, e.clientY)
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0]
+    handleDragStart(touch.clientX, touch.clientY)
+  }
+
+  useEffect(() => {
+    if (!isDragging) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      handleDragMove(e.clientX, e.clientY)
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const touch = e.touches[0]
+      handleDragMove(touch.clientX, touch.clientY)
+    }
+
+    const handleMouseUp = () => handleDragEnd()
+    const handleTouchEnd = () => handleDragEnd()
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+    window.addEventListener('touchmove', handleTouchMove)
+    window.addEventListener('touchend', handleTouchEnd)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('touchmove', handleTouchMove)
+      window.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [isDragging, dragStart])
+
   if (image) {
     return (
-      <div className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden group">
+      <div
+        ref={containerRef}
+        className="relative aspect-square bg-gray-100 rounded-lg overflow-hidden group"
+      >
         <img
           src={image}
           alt="Grid cell"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover select-none"
+          style={{
+            transform: `translate(${position.x}px, ${position.y}px)`,
+            cursor: isDragging ? 'grabbing' : 'grab',
+          }}
+          onMouseDown={handleMouseDown}
+          onTouchStart={handleTouchStart}
+          draggable={false}
         />
         <button
           onClick={onImageClear}
-          className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+          className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
           aria-label="Remove image"
         >
           &times;
         </button>
+        <div className="absolute bottom-2 left-2 text-xs text-white bg-black/50 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+          Drag to pan
+        </div>
       </div>
     )
   }
