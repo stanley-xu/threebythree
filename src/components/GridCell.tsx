@@ -19,6 +19,12 @@ const MIN_ZOOM = 1
 const MAX_ZOOM = 3
 const ZOOM_STEP = 0.1
 
+function getDistance(touch1: { clientX: number; clientY: number }, touch2: { clientX: number; clientY: number }): number {
+  const dx = touch1.clientX - touch2.clientX
+  const dy = touch1.clientY - touch2.clientY
+  return Math.sqrt(dx * dx + dy * dy)
+}
+
 export function GridCell({
   image,
   position,
@@ -30,7 +36,10 @@ export function GridCell({
 }: GridCellProps) {
   const [urlInput, setUrlInput] = useState('')
   const [isDragging, setIsDragging] = useState(false)
+  const [isPinching, setIsPinching] = useState(false)
   const [dragStart, setDragStart] = useState<Position>({ x: 0, y: 0 })
+  const [pinchStartDistance, setPinchStartDistance] = useState(0)
+  const [pinchStartZoom, setPinchStartZoom] = useState(1)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -74,7 +83,7 @@ export function GridCell({
   }
 
   const handleDragMove = (clientX: number, clientY: number) => {
-    if (!isDragging) return
+    if (!isDragging || isPinching) return
     onPositionChange({
       x: clientX - dragStart.x,
       y: clientY - dragStart.y,
@@ -83,6 +92,7 @@ export function GridCell({
 
   const handleDragEnd = () => {
     setIsDragging(false)
+    setIsPinching(false)
   }
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -91,8 +101,20 @@ export function GridCell({
   }
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0]
-    handleDragStart(touch.clientX, touch.clientY)
+    e.preventDefault()
+
+    if (e.touches.length === 2) {
+      // Pinch start
+      const distance = getDistance(e.touches[0], e.touches[1])
+      setPinchStartDistance(distance)
+      setPinchStartZoom(zoom)
+      setIsPinching(true)
+      setIsDragging(false)
+    } else if (e.touches.length === 1) {
+      // Single touch drag
+      const touch = e.touches[0]
+      handleDragStart(touch.clientX, touch.clientY)
+    }
   }
 
   const handleWheel = (e: React.WheelEvent) => {
@@ -113,15 +135,26 @@ export function GridCell({
   }
 
   useEffect(() => {
-    if (!isDragging) return
+    if (!isDragging && !isPinching) return
 
     const handleMouseMove = (e: MouseEvent) => {
       handleDragMove(e.clientX, e.clientY)
     }
 
     const handleTouchMove = (e: TouchEvent) => {
-      const touch = e.touches[0]
-      handleDragMove(touch.clientX, touch.clientY)
+      e.preventDefault()
+
+      if (e.touches.length === 2 && isPinching) {
+        // Pinch zoom
+        const currentDistance = getDistance(e.touches[0], e.touches[1])
+        const scale = currentDistance / pinchStartDistance
+        const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinchStartZoom * scale))
+        onZoomChange(newZoom)
+      } else if (e.touches.length === 1 && isDragging && !isPinching) {
+        // Single touch drag
+        const touch = e.touches[0]
+        handleDragMove(touch.clientX, touch.clientY)
+      }
     }
 
     const handleMouseUp = () => handleDragEnd()
@@ -129,7 +162,7 @@ export function GridCell({
 
     window.addEventListener('mousemove', handleMouseMove)
     window.addEventListener('mouseup', handleMouseUp)
-    window.addEventListener('touchmove', handleTouchMove)
+    window.addEventListener('touchmove', handleTouchMove, { passive: false })
     window.addEventListener('touchend', handleTouchEnd)
 
     return () => {
@@ -138,7 +171,7 @@ export function GridCell({
       window.removeEventListener('touchmove', handleTouchMove)
       window.removeEventListener('touchend', handleTouchEnd)
     }
-  }, [isDragging, dragStart])
+  }, [isDragging, isPinching, dragStart, pinchStartDistance, pinchStartZoom, zoom])
 
   if (image) {
     return (
@@ -154,6 +187,7 @@ export function GridCell({
           style={{
             transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
             cursor: isDragging ? 'grabbing' : 'grab',
+            touchAction: 'none',
           }}
           onMouseDown={handleMouseDown}
           onTouchStart={handleTouchStart}
@@ -187,7 +221,7 @@ export function GridCell({
             +
           </button>
         </div>
-        <div className="absolute bottom-2 right-2 text-xs text-white bg-black/50 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+        <div className="absolute bottom-2 right-2 text-xs text-white bg-black/50 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
           Scroll to zoom
         </div>
       </div>
@@ -195,7 +229,7 @@ export function GridCell({
   }
 
   return (
-    <div className="aspect-square bg-gray-100 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center p-4 gap-3">
+    <div className="aspect-square bg-gray-100 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center p-3 sm:p-4 gap-2 sm:gap-3">
       <div className="w-full flex flex-col gap-2">
         <input
           type="text"
@@ -203,18 +237,18 @@ export function GridCell({
           onChange={(e) => setUrlInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Paste image URL..."
-          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         />
         <button
           onClick={handleUrlSubmit}
           disabled={!urlInput.trim()}
-          className="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          className="w-full px-2 sm:px-3 py-2 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors cursor-pointer"
         >
           Load URL
         </button>
       </div>
 
-      <div className="w-full border-t border-gray-300 dark:border-gray-600 pt-3">
+      <div className="w-full border-t border-gray-300 dark:border-gray-600 pt-2 sm:pt-3">
         <input
           ref={fileInputRef}
           type="file"
@@ -224,7 +258,7 @@ export function GridCell({
         />
         <button
           onClick={handleUploadClick}
-          className="w-full px-3 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors cursor-pointer"
+          className="w-full px-2 sm:px-3 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors cursor-pointer"
         >
           Upload Image
         </button>

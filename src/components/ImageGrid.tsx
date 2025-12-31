@@ -139,7 +139,7 @@ export function ImageGrid() {
 
   return (
     <div className="w-full max-w-2xl mx-auto p-4">
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
         {images.map((image, index) => (
           <GridCell
             key={index}
