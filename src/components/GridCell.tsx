@@ -117,12 +117,25 @@ export function GridCell({
     }
   }
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault()
-    const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
-    const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom + delta))
-    onZoomChange(newZoom)
-  }
+  // Use native wheel listener to properly prevent browser zoom on macOS trackpad
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || !image) return
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      // macOS trackpad pinch fires wheel events with ctrlKey
+      const isPinchGesture = e.ctrlKey
+      const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
+      // Pinch gestures have smaller deltas, so we can use the same logic
+      const zoomDelta = isPinchGesture ? delta * 2 : delta
+      const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom + zoomDelta))
+      onZoomChange(newZoom)
+    }
+
+    container.addEventListener('wheel', handleWheel, { passive: false })
+    return () => container.removeEventListener('wheel', handleWheel)
+  }, [image, zoom, onZoomChange])
 
   const handleZoomIn = () => {
     const newZoom = Math.min(MAX_ZOOM, zoom + ZOOM_STEP)
@@ -176,7 +189,6 @@ export function GridCell({
       <div
         ref={containerRef}
         className="relative aspect-square bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden group transition-all duration-300"
-        onWheel={handleWheel}
       >
         <img
           src={image}
