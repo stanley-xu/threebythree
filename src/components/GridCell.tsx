@@ -124,11 +124,10 @@ export function GridCell({
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
-      // macOS trackpad pinch fires wheel events with ctrlKey
-      const isPinchGesture = e.ctrlKey
-      const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
-      // Pinch gestures have smaller deltas, so we can use the same logic
-      const zoomDelta = isPinchGesture ? delta * 2 : delta
+      // Use actual deltaY for smooth, proportional zoom
+      // Negative because scroll down (positive deltaY) should zoom out
+      const sensitivity = 0.005
+      const zoomDelta = -e.deltaY * sensitivity
       const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom + zoomDelta))
       onZoomChange(newZoom)
     }
