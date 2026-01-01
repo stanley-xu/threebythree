@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type ChangeEvent } from 'react'
+import { ImageInputModal } from './ImageInputModal'
 
 interface Position {
   x: number
@@ -40,6 +41,7 @@ export function GridCell({
   const [dragStart, setDragStart] = useState<Position>({ x: 0, y: 0 })
   const [pinchStartDistance, setPinchStartDistance] = useState(0)
   const [pinchStartZoom, setPinchStartZoom] = useState(1)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -104,14 +106,12 @@ export function GridCell({
     e.preventDefault()
 
     if (e.touches.length === 2) {
-      // Pinch start
       const distance = getDistance(e.touches[0], e.touches[1])
       setPinchStartDistance(distance)
       setPinchStartZoom(zoom)
       setIsPinching(true)
       setIsDragging(false)
     } else if (e.touches.length === 1) {
-      // Single touch drag
       const touch = e.touches[0]
       handleDragStart(touch.clientX, touch.clientY)
     }
@@ -145,13 +145,11 @@ export function GridCell({
       e.preventDefault()
 
       if (e.touches.length === 2 && isPinching) {
-        // Pinch zoom
         const currentDistance = getDistance(e.touches[0], e.touches[1])
         const scale = currentDistance / pinchStartDistance
         const newZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinchStartZoom * scale))
         onZoomChange(newZoom)
       } else if (e.touches.length === 1 && isDragging && !isPinching) {
-        // Single touch drag
         const touch = e.touches[0]
         handleDragMove(touch.clientX, touch.clientY)
       }
@@ -177,7 +175,7 @@ export function GridCell({
     return (
       <div
         ref={containerRef}
-        className="relative aspect-square bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden group"
+        className="relative aspect-square bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden group transition-all duration-300"
         onWheel={handleWheel}
       >
         <img
@@ -195,12 +193,14 @@ export function GridCell({
         />
         <button
           onClick={onImageClear}
-          className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
+          className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer z-10"
           aria-label="Remove image"
         >
-          &times;
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
         </button>
-        <div className="absolute bottom-2 left-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+        <div className="absolute bottom-2 left-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10">
           <button
             onClick={handleZoomOut}
             disabled={zoom <= MIN_ZOOM}
@@ -221,48 +221,82 @@ export function GridCell({
             +
           </button>
         </div>
-        <div className="absolute bottom-2 right-2 text-xs text-white bg-black/50 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none hidden sm:block">
+        <div className="absolute bottom-2 right-2 text-xs text-white bg-black/50 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none hidden sm:block">
           Scroll to zoom
         </div>
       </div>
     )
   }
 
+  // Empty state with progressive disclosure
   return (
-    <div className="aspect-square bg-gray-100 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center p-3 sm:p-4 gap-2 sm:gap-3">
-      <div className="w-full flex flex-col gap-2">
-        <input
-          type="text"
-          value={urlInput}
-          onChange={(e) => setUrlInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Paste image URL..."
-          className="w-full px-2 sm:px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        />
+    <>
+      <div className="aspect-square bg-gray-100 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex flex-col items-center justify-center transition-all duration-300 group relative overflow-hidden">
+        {/* Mobile: Plus button that opens modal */}
         <button
-          onClick={handleUrlSubmit}
-          disabled={!urlInput.trim()}
-          className="w-full px-2 sm:px-3 py-2 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          onClick={() => setIsModalOpen(true)}
+          className="sm:hidden w-full h-full flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400 transition-colors cursor-pointer"
+          aria-label="Add image"
         >
-          Load URL
+          <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+          </svg>
         </button>
+
+        {/* Desktop: Plus icon visible by default, inputs on hover */}
+        <div className="hidden sm:flex flex-col items-center justify-center w-full h-full">
+          {/* Plus icon - visible by default, fades on hover */}
+          <div className="absolute inset-0 flex items-center justify-center text-gray-400 dark:text-gray-500 opacity-100 group-hover:opacity-0 transition-opacity duration-200 pointer-events-none">
+            <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+            </svg>
+          </div>
+
+          {/* Inputs - hidden by default, visible on hover */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <div className="w-full flex flex-col gap-2">
+              <input
+                type="text"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Paste image URL..."
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
+              />
+              <button
+                onClick={handleUrlSubmit}
+                disabled={!urlInput.trim()}
+                className="w-full px-3 py-2 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-all duration-300 cursor-pointer"
+              >
+                Load URL
+              </button>
+            </div>
+
+            <div className="w-full border-t border-gray-300 dark:border-gray-600 pt-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              <button
+                onClick={handleUploadClick}
+                className="w-full px-3 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition-all duration-300 cursor-pointer"
+              >
+                Upload Image
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="w-full border-t border-gray-300 dark:border-gray-600 pt-2 sm:pt-3">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleFileChange}
-          className="hidden"
-        />
-        <button
-          onClick={handleUploadClick}
-          className="w-full px-2 sm:px-3 py-2 text-sm bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors cursor-pointer"
-        >
-          Upload Image
-        </button>
-      </div>
-    </div>
+      {/* Mobile modal */}
+      <ImageInputModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onImageSet={onImageSet}
+      />
+    </>
   )
 }
