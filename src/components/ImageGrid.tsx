@@ -138,7 +138,7 @@ export function ImageGrid() {
   const hasAnyImage = images.some((img) => img !== null)
 
   return (
-    <div className="w-full max-w-2xl mx-auto p-4">
+    <div className="w-full max-w-2xl mx-auto">
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
         {images.map((image, index) => (
           <GridCell
@@ -156,7 +156,7 @@ export function ImageGrid() {
       {hasAnyImage && (
         <button
           onClick={handleSave}
-          className="mt-4 w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors cursor-pointer font-medium"
+          className="mt-4 w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-300 cursor-pointer font-medium"
         >
           Save Image
         </button>
