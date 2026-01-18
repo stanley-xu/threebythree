@@ -183,6 +183,13 @@ export function GridCell({
     }
   }, [isDragging, isPinching, dragStart, pinchStartDistance, pinchStartZoom, zoom])
 
+  const handleReset = () => {
+    onPositionChange({ x: 0, y: 0 })
+    onZoomChange(1)
+  }
+
+  const isModified = position.x !== 0 || position.y !== 0 || zoom !== 1
+
   if (image) {
     return (
       <div
@@ -202,15 +209,28 @@ export function GridCell({
           onTouchStart={handleTouchStart}
           draggable={false}
         />
+        {/* Delete button - always visible on mobile, hover on desktop */}
         <button
           onClick={onImageClear}
-          className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer z-10"
+          className="absolute top-2 right-2 bg-black/70 hover:bg-black/90 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-200 cursor-pointer z-10"
           aria-label="Remove image"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
+        {/* Reset button - only show when modified */}
+        {isModified && (
+          <button
+            onClick={handleReset}
+            className="absolute top-2 left-2 bg-black/70 hover:bg-black/90 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-200 cursor-pointer z-10"
+            aria-label="Reset position and zoom"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        )}
         <div className="absolute bottom-2 left-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10">
           <button
             onClick={handleZoomOut}
